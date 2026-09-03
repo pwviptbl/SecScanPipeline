@@ -27,7 +27,7 @@ if [ "$1" == "--bg" ] || [ "$1" == "--background" ]; then
     mkdir -p "$SCRIPT_DIR/logs"
     echo "[+] Iniciando Painel Web em SEGUNDO PLANO na porta $PORT..."
     echo "[+] Log do servidor: $LOG_FILE"
-    setsid "$VENV_DIR/bin/python3" -u "$SCRIPT_DIR/app.py" >> "$LOG_FILE" 2>&1 &
+    setsid "$VENV_DIR/bin/python3" -u "$SCRIPT_DIR/app.py" < /dev/null >> "$LOG_FILE" 2>&1 &
     PID=$!
     echo "[✓] Servidor iniciado com PID: $PID"
     echo "[*] Acesse: http://localhost:$PORT"

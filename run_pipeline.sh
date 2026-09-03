@@ -39,7 +39,7 @@ if [ "$1" == "--bg" ] || [ "$1" == "--background" ]; then
     mkdir -p "$SCRIPT_DIR/logs"
     echo "[+] Iniciando em SEGUNDO PLANO (Background)..."
     echo "[+] Arquivo de log: $LOG_FILE"
-    setsid "$VENV_DIR/bin/python3" -u "$SCRIPT_DIR/pipeline.py" "$@" > "$LOG_FILE" 2>&1 &
+    setsid "$VENV_DIR/bin/python3" -u "$SCRIPT_DIR/pipeline.py" "$@" < /dev/null > "$LOG_FILE" 2>&1 &
     PID=$!
     echo "[✓] Processo iniciado com PID: $PID"
     echo "[*] Para acompanhar o log em tempo real: tail -f $LOG_FILE"
