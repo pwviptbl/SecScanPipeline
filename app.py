@@ -135,8 +135,9 @@ def api_generate_pdf():
     client_id = request.args.get("client", "Niteroi")
     year = int(request.args.get("year", datetime.now().year))
     month = int(request.args.get("month", datetime.now().month))
+    report_type = request.args.get("type", "full")
     
-    pdf_path = generate_pdf_report(client_id, year, month)
+    pdf_path = generate_pdf_report(client_id, year, month, report_type=report_type)
     filename = Path(pdf_path).name
     return send_file(pdf_path, as_attachment=True, download_name=filename, mimetype="application/pdf")
 

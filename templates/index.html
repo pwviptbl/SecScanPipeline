@@ -46,7 +46,7 @@
         <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4 shadow-sm backdrop-blur flex flex-wrap items-center justify-between gap-4">
             <form method="GET" action="/" class="flex flex-wrap items-center gap-3">
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Cliente / Órgão</label>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Órgão</label>
                     <select name="client" onchange="this.form.submit()" class="bg-slate-900 border border-slate-600 text-sm rounded-lg px-3 py-1.5 text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
                         {% for c in clientes %}
                         <option value="{{ c.id }}" {% if c.id == client_id %}selected{% endif %}>{{ c.nome }}</option>
@@ -73,11 +73,14 @@
             </form>
 
             <div class="flex items-center space-x-2">
-                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-file-pdf"></i> Baixar Relatório Mensal (PDF)
+                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}&type=summary" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Gera apenas a Matriz Diária de 1 página com parecer assinado">
+                    <i class="fa-solid fa-table-cells"></i> Matriz Resumida (PDF 1 pág)
                 </a>
-                <button onclick="openZipModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-file-zipper"></i> Exportar ZIP de Evidências
+                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}&type=full" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Gera o Relatório Técnico Completo Multi-Nível (5 páginas com estatísticas DAST, amostragem e custódia SHA-256)">
+                    <i class="fa-solid fa-file-pdf"></i> Relatório Completo (PDF 5 págs)
+                </a>
+                <button onclick="openZipModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-zipper"></i> Exportar ZIP
                 </button>
             </div>
         </div>

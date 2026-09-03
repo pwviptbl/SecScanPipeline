@@ -72,8 +72,9 @@ evidencias/
 - **Matriz de Execução**: Visualize os dias executados com **S** (verde) e **N** (vermelho).
 - **Log de Erros e Detalhes**: Clique em qualquer célula para abrir o log detalhado e a evidência associada.
 - **Re-executar Apenas 1 Aplicação**: Clique na célula e selecione `🔁 Re-executar Apenas Esta Aplicação`.
-- **Botão "Baixar Relatório Mensal (PDF)"**: Gera e baixa o PDF oficial com a matriz do mês.
-- **Botão "Exportar ZIP de Evidências"**: Baixe os arquivos brutos selecionando o escopo desejado.
+- **Botão "Matriz Resumida (PDF 1 pág)"**: Gera o PDF executivo de 1 página contendo a matriz de conformidade com os 30 dias e parecer assinado (ideal para aprovação contratual e fiscal).
+- **Botão "Relatório Completo (PDF 5 págs)"**: Gera o relatório técnico aprofundado em 4 níveis (Matriz Executiva, Estatísticas DAST/Portas, Fichas Técnicas com Logs Forenses e Tabela de Custódia com Hashes SHA-256 de todas as evidências).
+- **Botão "Exportar ZIP"**: Baixe os arquivos brutos selecionando o escopo desejado.
 - **Botão "Rodar Scan Agora"**: Dispara uma nova varredura completa em background.
 
 ---
@@ -83,17 +84,14 @@ evidencias/
 O script `setup_cron.sh` gerencia o agendamento no Crontab do sistema:
 
 ```bash
-# Definir um horário específico (ex: todo dia às 02:00 AM)
-./setup_cron.sh --time 02:00
+# Definir um horário específico (ex: todo dia às 03:00 AM)
+./setup_cron.sh --time 03:00
 
-# Definir outro horário (ex: todo dia às 23:30)
-./setup_cron.sh --time 23:30
+# Definir outro horário (ex: todo dia às 02:00 AM)
+./setup_cron.sh --time 02:00
 
 # Instalar no horário padrão (02:00 AM)
 ./setup_cron.sh --install
-
-# Instalar com redundância (2x ao dia: 02:00 AM e 14:00 PM)
-./setup_cron.sh --install-2x
 
 # Verificar status do agendamento
 ./setup_cron.sh --status
@@ -142,10 +140,18 @@ tail -f logs/execution_$(date +%Y-%m-%d)*.log
 
 ## 📄 Geração de Relatórios PDF via Linha de Comando
 
-```bash
-# Gerar PDF do mês atual para Niterói
-python3 report_generator.py --client Niteroi --year 2026 --month 9
+O sistema suporta a geração de dois modelos de relatório em PDF:
 
-# Gerar PDF de Agosto/2026
-python3 report_generator.py --client Niteroi --year 2026 --month 8
+### 1. Relatório Completo Multi-Nível (5 Páginas):
+Inclui Matriz (Nível 1), Estatísticas de Perímetro com 6.544 checks de rotas e bloqueio WAF (Nível 2), Fichas Técnicas com Logs Forenses (Nível 3) e Tabela de Hashes SHA-256 de todas as evidências (Nível 4):
+
+```bash
+python3 report_generator.py --client Niteroi --year 2026 --month 9 --type full
+```
+
+### 2. Matriz Resumida (1 Página):
+Inclui apenas a grade mensal com indicadores de conformidade S/N e parecer assinado:
+
+```bash
+python3 report_generator.py --client Niteroi --year 2026 --month 9 --type summary
 ```
