@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecScannerPipeline - Painel de Evidências Diárias</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .matrix-scroll::-webkit-scrollbar { height: 6px; }
+        .matrix-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                    <i class="fa-solid fa-shield-halved text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+                        SecScanner <span class="text-sky-400 font-mono text-xs bg-sky-950 border border-sky-800 px-2 py-0.5 rounded">DBSeller</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Controle Diário de Evidências de Segurança (DAST & Portas)</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <a href="/logs" class="text-xs text-slate-300 hover:text-white bg-slate-700/60 hover:bg-slate-700 px-3 py-1.5 rounded-md border border-slate-600 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-list-check"></i> Histórico de Scans
+                </a>
+                <button onclick="triggerScan()" class="text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-md shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-play"></i> Rodar Scan Agora
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- Filter & Control Bar -->
+        <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4 shadow-sm backdrop-blur flex flex-wrap items-center justify-between gap-4">
+            <form method="GET" action="/" class="flex flex-wrap items-center gap-3">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Cliente / Órgão</label>
+                    <select name="client" onchange="this.form.submit()" class="bg-slate-900 border border-slate-600 text-sm rounded-lg px-3 py-1.5 text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                        {% for c in clientes %}
+                        <option value="{{ c.id }}" {% if c.id == client_id %}selected{% endif %}>{{ c.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Ano</label>
+                    <select name="year" onchange="this.form.submit()" class="bg-slate-900 border border-slate-600 text-sm rounded-lg px-3 py-1.5 text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                        {% for y in [2025, 2026, 2027] %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Mês de Competência</label>
+                    <select name="month" onchange="this.form.submit()" class="bg-slate-900 border border-slate-600 text-sm rounded-lg px-3 py-1.5 text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                        {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ "%02d"|format(m) }} - {{ month_name if m == month else "Mês "~m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+
+            <div class="flex items-center space-x-2">
+                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-pdf"></i> Baixar Relatório Mensal (PDF)
+                </a>
+                <button onclick="openZipModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-zipper"></i> Exportar ZIP de Evidências
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-xs text-slate-400 font-medium">Total de Verificações</div>
+                    <div class="text-2xl font-bold text-white mt-1">{{ total_checks }}</div>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-chart-simple"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-xs text-slate-400 font-medium">Scans com Sucesso (S)</div>
+                    <div class="text-2xl font-bold text-emerald-400 mt-1">{{ success_checks }}</div>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-xs text-slate-400 font-medium">Falhas Registradas (N)</div>
+                    <div class="text-2xl font-bold {% if error_checks == 0 %}text-slate-400{% else %}text-rose-400{% endif %} mt-1">{{ error_checks }}</div>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-xs text-slate-400 font-medium">Índice de Execução</div>
+                    <div class="text-2xl font-bold text-emerald-400 mt-1">{{ compliance_pct }}%</div>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-certificate"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Matriz Diária de Execução (Calendar View) -->
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-lg overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <h2 class="text-sm font-bold text-white uppercase tracking-wider">
+                        Matriz de Execução Mensal • {{ month_name }} / {{ year }}
+                    </h2>
+                    <span class="text-[11px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-medium">
+                        {{ matrix|length }} aplicações cadastradas
+                    </span>
+                </div>
+                <div class="flex items-center space-x-3 text-xs">
+                    <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 bg-emerald-500 rounded-sm"></span> <strong>S</strong> (Sucesso)</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 bg-rose-500 rounded-sm"></span> <strong>N</strong> (Falha)</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 bg-slate-700 rounded-sm"></span> <strong>-</strong> (Não Executado)</span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto matrix-scroll">
+                <table class="w-full text-xs text-center border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900/90 text-slate-300 font-bold border-b border-slate-700">
+                            <th class="py-3 px-4 text-left w-48 sticky left-0 bg-slate-900 z-10 border-r border-slate-700">Aplicação</th>
+                            <th class="py-3 px-3 text-left w-24 border-r border-slate-700">Scan</th>
+                            {% for d in days_range %}
+                            <th class="py-3 px-1.5 min-w-[30px] border-r border-slate-800 {% if now.year == year and now.month == month and now.day == d %}bg-sky-950/60 text-sky-400 font-extrabold ring-1 ring-sky-500{% endif %}">
+                                {{ d }}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/60">
+                        {% for prod in matrix %}
+                            {% for tool_key, tool_label, tool_icon in [('nmap', 'Nmap', 'fa-network-wired'), ('nikto', 'Nikto', 'fa-server'), ('owasp_zap', 'OWASP', 'fa-spider')] %}
+                            <tr class="hover:bg-slate-750/50 transition">
+                                {% if loop.first %}
+                                <td class="py-2.5 px-4 text-left font-bold text-white bg-slate-850/80 sticky left-0 z-10 border-r border-slate-700 border-b border-slate-700" rowspan="3">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-cube text-sky-400"></i>
+                                        <span>{{ prod.name }}</span>
+                                    </div>
+                                </td>
+                                {% endif %}
+                                
+                                <td class="py-1.5 px-3 text-left text-slate-300 font-semibold border-r border-slate-700 bg-slate-800/40">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <i class="fa-solid {{ tool_icon }} text-[10px] text-slate-400"></i>
+                                        {{ tool_label }}
+                                    </span>
+                                </td>
+
+                                {% for d in days_range %}
+                                <td class="py-1 px-1 border-r border-slate-800/60 text-center">
+                                    {% if prod.tools[tool_key] and d in prod.tools[tool_key] %}
+                                        {% set check = prod.tools[tool_key][d] %}
+                                        {% if check.status == 'SUCCESS' %}
+                                        <button onclick="openDetailModal('{{ client_id }}', '{{ prod.name }}', '{{ tool_key }}', {{ year }}, {{ month }}, {{ d }})" 
+                                                class="w-6 h-6 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white font-bold transition flex items-center justify-center mx-auto text-[11px]" 
+                                                title="Executado com Sucesso no dia {{ d }}">
+                                            S
+                                        </button>
+                                        {% else %}
+                                        <button onclick="openDetailModal('{{ client_id }}', '{{ prod.name }}', '{{ tool_key }}', {{ year }}, {{ month }}, {{ d }})" 
+                                                class="w-6 h-6 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white font-bold transition flex items-center justify-center mx-auto text-[11px]" 
+                                                title="Falha na execução no dia {{ d }} - Clique para ver o erro">
+                                            N
+                                        </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-slate-600 font-mono select-none">-</span>
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Detalhes do Scan / Log de Erro -->
+    <div id="detailModal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-2xl w-full overflow-hidden shadow-2xl">
+            <div class="px-5 py-3.5 border-b border-slate-700 flex items-center justify-between bg-slate-850">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2" id="modalTitle">
+                    <i class="fa-solid fa-terminal text-sky-400"></i> Detalhes da Execução
+                </h3>
+                <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div class="grid grid-cols-2 gap-3 text-xs bg-slate-900/60 p-3 rounded-lg border border-slate-700/60">
+                    <div><span class="text-slate-400">Aplicação:</span> <strong id="mProd" class="text-white"></strong></div>
+                    <div><span class="text-slate-400">Ferramenta:</span> <strong id="mTool" class="text-white"></strong></div>
+                    <div><span class="text-slate-400">Data/Hora:</span> <span id="mDate" class="text-slate-300"></span></div>
+                    <div><span class="text-slate-400">Status:</span> <span id="mStatus"></span></div>
+                    <div><span class="text-slate-400">Duração:</span> <span id="mDur" class="text-slate-300"></span>s</div>
+                    <div><span class="text-slate-400">Evidência:</span> <span id="mEv" class="font-mono text-sky-400 text-[11px]"></span></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Log de Saída / Detalhe Técnico:</label>
+                    <pre id="mLog" class="bg-slate-950 p-3 rounded-lg text-[11px] font-mono text-slate-300 max-h-56 overflow-y-auto border border-slate-800 whitespace-pre-wrap select-all"></pre>
+                </div>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-700 bg-slate-850 flex justify-between items-center">
+                <button id="mBtnRerun" onclick="rerunCurrentScan()" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-md text-xs font-semibold shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right"></i> Re-executar Apenas Esta Aplicação
+                </button>
+                <button onclick="closeDetailModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-xs font-medium transition">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Exportar ZIP -->
+    <div id="zipModal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div class="px-5 py-3.5 border-b border-slate-700 flex items-center justify-between bg-slate-850">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-file-zipper text-indigo-400"></i> Exportar ZIP de Evidências
+                </h3>
+                <button onclick="closeZipModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+                <p class="text-slate-300">Escolha o escopo das evidências brutas para download em arquivo comprimido ZIP:</p>
+                
+                <div class="space-y-2">
+                    <!-- Opção 1: Todas no Mês Atual -->
+                    <a href="/api/export-zip?scope=month&client={{ client_id }}&year={{ year }}&month={{ month }}" 
+                       class="block p-3 rounded-lg border border-slate-700 hover:border-indigo-500 bg-slate-900/60 hover:bg-indigo-950/30 transition">
+                        <strong class="text-white block">📦 Todas as Aplicações do Mês ({{ month_name }}/{{ year }})</strong>
+                        <span class="text-slate-400 text-[11px]">Baixa todas as evidências (Nmap, Nikto, ZAP) de todas as aplicações no mês selecionado.</span>
+                    </a>
+
+                    <!-- Opção 2: Todas em Todos os Meses -->
+                    <a href="/api/export-zip?scope=all&client={{ client_id }}" 
+                       class="block p-3 rounded-lg border border-slate-700 hover:border-indigo-500 bg-slate-900/60 hover:bg-indigo-950/30 transition">
+                        <strong class="text-white block">🗄️ Todas as Aplicações de Todos os Meses (Consolidado)</strong>
+                        <span class="text-slate-400 text-[11px]">Baixa o repositório completo com todos os anos, meses e dias de evidências.</span>
+                    </a>
+
+                    <!-- Opção 3: Aplicação Específica -->
+                    <div class="p-3 rounded-lg border border-slate-700 bg-slate-900/60 space-y-2">
+                        <strong class="text-white block">🎯 Aplicação Específica no Mês</strong>
+                        <div class="flex gap-2">
+                            <select id="zipProdSelect" class="bg-slate-950 border border-slate-600 rounded px-2 py-1 text-white text-xs w-full">
+                                {% for prod in matrix %}
+                                <option value="{{ prod.name }}">{{ prod.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <button onclick="downloadProductZip()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1 rounded text-xs">
+                                Baixar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-700 bg-slate-850 flex justify-end">
+                <button onclick="closeZipModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-xs font-medium transition">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Interação -->
+    <script>
+        let currentModalClient = '';
+        let currentModalProduct = '';
+        let currentModalTool = '';
+
+        function openDetailModal(client, product, tool, year, month, day) {
+            currentModalClient = client;
+            currentModalProduct = product;
+            currentModalTool = tool;
+
+            fetch(`/api/scan-detail?client=${client}&product=${product}&tool=${tool}&year=${year}&month=${month}&day=${day}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.found) {
+                        alert("Detalhes não encontrados.");
+                        return;
+                    }
+                    document.getElementById('mProd').innerText = d.product_name;
+                    document.getElementById('mTool').innerText = d.tool.toUpperCase();
+                    document.getElementById('mDate').innerText = d.executed_at;
+                    document.getElementById('mDur').innerText = d.duration_seconds || 0;
+                    document.getElementById('mEv').innerText = d.evidence_path || "N/A";
+                    document.getElementById('mLog').innerText = d.log_output || "Sem logs registrados.";
+
+                    const statusSpan = document.getElementById('mStatus');
+                    let wafBadge = '';
+                    if ((d.log_output && d.log_output.toLowerCase().includes('waf')) || (d.log_output && d.log_output.toLowerCase().includes('firewall')) || (d.log_output && d.log_output.toLowerCase().includes('perimetral'))) {
+                        wafBadge = ' <span class="bg-sky-500/20 text-sky-400 font-semibold px-2 py-0.5 rounded text-[10px] ml-1">🛡️ WAF/Firewall Ativo</span>';
+                    }
+                    if (d.status === 'SUCCESS') {
+                        statusSpan.innerHTML = '<span class="bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded text-[11px]">EXECUTADO COM SUCESSO (S)</span>' + wafBadge;
+                    } else {
+                        statusSpan.innerHTML = '<span class="bg-rose-500/20 text-rose-400 font-bold px-2 py-0.5 rounded text-[11px]">FALHA / ERRO (N)</span>';
+                    }
+
+                    document.getElementById('detailModal').classList.remove('hidden');
+                });
+        }
+
+        function rerunCurrentScan() {
+            if (!currentModalProduct) return;
+            if (!confirm(`Deseja re-executar os scans de segurança apenas para a aplicação '${currentModalProduct}'?`)) {
+                return;
+            }
+            fetch('/api/rerun-scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client: currentModalClient,
+                    product: currentModalProduct,
+                    tool: currentModalTool
+                })
+            })
+            .then(r => r.json())
+            .then(d => {
+                alert(d.message);
+                closeDetailModal();
+            })
+            .catch(e => {
+                alert("Erro ao solicitar re-execução: " + e);
+            });
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+        }
+
+        function openZipModal() {
+            document.getElementById('zipModal').classList.remove('hidden');
+        }
+
+        function closeZipModal() {
+            document.getElementById('zipModal').classList.add('hidden');
+        }
+
+        function downloadProductZip() {
+            const prod = document.getElementById('zipProdSelect').value;
+            window.location.href = `/api/export-zip?scope=product_month&client={{ client_id }}&product=${prod}&year={{ year }}&month={{ month }}`;
+        }
+
+        function triggerScan() {
+            if (!confirm("Deseja iniciar a rotina completa de scans de segurança agora em segundo plano?")) {
+                return;
+            }
+            fetch('/api/run-pipeline', { method: 'POST' })
+                .then(r => r.json())
+                .then(d => {
+                    alert(d.message);
+                })
+                .catch(e => {
+                    alert("Erro ao acionar pipeline: " + e);
+                });
+        }
+    </script>
+</body>
+</html>

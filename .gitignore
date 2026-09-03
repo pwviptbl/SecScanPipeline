@@ -1,0 +1,20 @@
+# Ambientes Virtuais
+.venv/
+env/
+venv/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Dados, Logs e Evidências locais
+data/*.db
+data/*.sqlite3
+logs/*.log
+reports/**/*.pdf
+evidencias/
+
+# Temporários
+*.tmp
+*.bak

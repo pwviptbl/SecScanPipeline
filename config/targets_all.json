@@ -1,0 +1,52 @@
+{
+  "clientes": [
+    {
+      "id": "Niteroi",
+      "nome": "Prefeitura Municipal de Niterói",
+      "produtos": [
+        {
+          "nome": "Ecidade",
+          "host": "ecidade.niteroi.rj.gov.br",
+          "url": "https://ecidade.niteroi.rj.gov.br/",
+          "ip": "20.206.250.216"
+        },
+        {
+          "nome": "Ecidade_Homologacao",
+          "host": "homologacao.niteroi.rj.gov.br",
+          "url": "https://homologacao.niteroi.rj.gov.br/",
+          "ip": "74.163.189.77"
+        },
+        {
+          "nome": "Ecidade_Online",
+          "host": "portais.niteroi.rj.gov.br",
+          "url": "https://portais.niteroi.rj.gov.br/",
+          "ip": "150.171.110.42"
+        },
+        {
+          "nome": "Portal_GRM",
+          "host": "grm.fazenda.niteroi.rj.gov.br",
+          "url": "https://grm.fazenda.niteroi.rj.gov.br/",
+          "ip": "150.171.110.39"
+        },
+        {
+          "nome": "Estorage",
+          "host": "estorage.niteroi.rj.gov.br",
+          "url": "https://estorage.niteroi.rj.gov.br/",
+          "ip": "4.228.91.240"
+        },
+        {
+          "nome": "Processo_Eletronico",
+          "host": "atendimento.niteroi.rj.gov.br",
+          "url": "https://atendimento.niteroi.rj.gov.br/",
+          "ip": "150.171.110.33"
+        },
+        {
+          "nome": "Transparencia",
+          "host": "transparencia.niteroi.rj.gov.br",
+          "url": "https://transparencia.niteroi.rj.gov.br/",
+          "ip": "150.171.110.37"
+        }
+      ]
+    }
+  ]
+}
