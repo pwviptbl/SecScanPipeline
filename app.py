@@ -86,6 +86,7 @@ def index():
         year=year,
         month=month,
         month_name=MONTH_NAMES_PT.get(month, f"Mês {month:02d}"),
+        months_pt=MONTH_NAMES_PT,
         days_range=days_range,
         matrix=matrix,
         total_checks=total_checks,

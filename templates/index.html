@@ -56,18 +56,17 @@
 
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Ano</label>
-                    <select name="year" onchange="this.form.submit()" class="bg-slate-900 border border-slate-600 text-sm rounded-lg px-3 py-1.5 text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
-                        {% for y in [2025, 2026, 2027] %}
-                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="bg-slate-900 border border-slate-700 text-sm rounded-lg px-3 py-1.5 text-slate-200 font-bold font-mono">
+                        {{ year }}
+                    </div>
+                    <input type="hidden" name="year" value="{{ year }}">
                 </div>
 
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-400 uppercase mb-1">Mês de Competência</label>
                     <select name="month" onchange="this.form.submit()" class="bg-slate-900 border border-slate-600 text-sm rounded-lg px-3 py-1.5 text-white focus:ring-2 focus:ring-sky-500 focus:outline-none">
                         {% for m in range(1, 13) %}
-                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ "%02d"|format(m) }} - {{ month_name if m == month else "Mês "~m }}</option>
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ "%02d"|format(m) }} - {{ months_pt[m] }}</option>
                         {% endfor %}
                     </select>
                 </div>
