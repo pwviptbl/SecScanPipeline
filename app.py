@@ -153,6 +153,7 @@ def api_export_zip():
     Exporta evidências em arquivo ZIP:
     - scope: 'all' (tudo), 'month' (todo o mês), 'product_month' (aplicação no mês), 'product_day' (aplicação no dia)
     """
+    import hashlib
     scope = request.args.get("scope", "month")
     client_id = request.args.get("client", "Niteroi")
     product = request.args.get("product", "")
@@ -171,7 +172,8 @@ def api_export_zip():
     temp_zip.close()
     
     zip_filename = f"Evidencias_{client_id}"
-    
+    files_to_hash = []
+
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         if scope == "all":
             zip_filename = f"Evidencias_Todas_Aplicacoes_Consolidado.zip"
@@ -180,6 +182,8 @@ def api_export_zip():
                     full_path = Path(root) / file
                     rel_path = full_path.relative_to(EVIDENCIAS_DIR)
                     zf.write(full_path, arcname=str(rel_path))
+                    sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
+                    files_to_hash.append((sha, str(rel_path)))
                     
         elif scope == "product_day" and product and day:
             target_path = EVIDENCIAS_DIR / client_id / product / str(year) / str(month) / str(day)
@@ -190,6 +194,8 @@ def api_export_zip():
                         full_path = Path(root) / file
                         rel_path = full_path.relative_to(EVIDENCIAS_DIR)
                         zf.write(full_path, arcname=str(rel_path))
+                        sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
+                        files_to_hash.append((sha, str(rel_path)))
                         
         elif scope == "product_month" and product:
             target_path = EVIDENCIAS_DIR / client_id / product / str(year) / str(month)
@@ -200,6 +206,8 @@ def api_export_zip():
                         full_path = Path(root) / file
                         rel_path = full_path.relative_to(EVIDENCIAS_DIR)
                         zf.write(full_path, arcname=str(rel_path))
+                        sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
+                        files_to_hash.append((sha, str(rel_path)))
                         
         else: # scope == 'month'
             zip_filename = f"Evidencias_{client_id}_{year}_{month}_Todos_Produtos.zip"
@@ -214,6 +222,8 @@ def api_export_zip():
                                 full_path = Path(root) / file
                                 rel_path = full_path.relative_to(EVIDENCIAS_DIR)
                                 zf.write(full_path, arcname=str(rel_path))
+                                sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
+                                files_to_hash.append((sha, str(rel_path)))
 
         # Inclui o Relatório PDF Completo oficial correspondente dentro do ZIP
         try:
@@ -222,9 +232,89 @@ def api_export_zip():
             importlib.reload(report_generator)
             pdf_path = report_generator.generate_pdf_report(client_id, int(year), int(month), report_type="full")
             if pdf_path and Path(pdf_path).exists():
-                zf.write(pdf_path, arcname=Path(pdf_path).name)
+                pdf_bytes = Path(pdf_path).read_bytes()
+                pdf_arcname = Path(pdf_path).name
+                zf.write(pdf_path, arcname=pdf_arcname)
+                pdf_sha = hashlib.sha256(pdf_bytes).hexdigest()
+                files_to_hash.insert(0, (pdf_sha, pdf_arcname))
         except Exception as e:
             print(f"[!] Aviso: Nao foi possivel incluir o PDF no ZIP: {e}")
+
+        # Gera SHA256SUMS.txt
+        if files_to_hash:
+            checksum_content = "\n".join([f"{sha}  {path}" for sha, path in files_to_hash]) + "\n"
+            zf.writestr("SHA256SUMS.txt", checksum_content)
+
+        # Gera script verificar_hashes.bat (Windows 1-clique)
+        bat_script = """@echo off
+chcp 65001 >nul
+title Auditoria de Custodia e Integridade - SecScannerPipeline
+cls
+echo =====================================================================
+echo    AUDITORIA DE CUSTODIA FORENSE E INTEGRIDADE DE EVIDENCIAS
+echo    Algoritmo: SHA-256 (NIST FIPS 180-4)
+echo =====================================================================
+echo.
+echo Verificando a integridade de todos os arquivos contra SHA256SUMS.txt...
+echo Aguarde...
+echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$erros = 0; $total = 0; " ^
+  "if (-not (Test-Path 'SHA256SUMS.txt')) { Write-Host '[ERRO] Arquivo SHA256SUMS.txt nao encontrado!' -ForegroundColor Red; exit 1 }; " ^
+  "Get-Content 'SHA256SUMS.txt' | ForEach-Object { " ^
+  "  $linha = $_.Trim(); " ^
+  "  if (-not $linha -or $linha.StartsWith('#')) { return }; " ^
+  "  $partes = $linha -split '\s+', 2; " ^
+  "  if ($partes.Length -lt 2) { return }; " ^
+  "  $hashEsp = $partes[0].Trim().ToLower(); " ^
+  "  $caminho = $partes[1].Trim().Replace('/', [System.IO.Path]::DirectorySeparatorChar); " ^
+  "  $total++; " ^
+  "  if (Test-Path $caminho) { " ^
+  "    $hashCalc = (Get-FileHash $caminho -Algorithm SHA256).Hash.ToLower(); " ^
+  "    if ($hashCalc -eq $hashEsp) { " ^
+  "      Write-Host ('[OK - INTEGRO] ' + $caminho) -ForegroundColor Green; " ^
+  "    } else { " ^
+  "      Write-Host ('[FALHA / ADULTERADO] ' + $caminho) -ForegroundColor Red; " ^
+  "      $erros++; " ^
+  "    } " ^
+  "  } else { " ^
+  "    Write-Host ('[ARQUIVO AUSENTE] ' + $caminho) -ForegroundColor Yellow; " ^
+  "    $erros++; " ^
+  "  } " ^
+  "}; " ^
+  "Write-Host ''; " ^
+  "Write-Host '=====================================================================' -ForegroundColor Cyan; " ^
+  "if ($erros -eq 0) { " ^
+  "  Write-Host ('RESULTADO: SUCESSO! Todos os ' + $total + ' arquivos estao 100% integros e conferem com o relatorio.') -ForegroundColor Green; " ^
+  "} else { " ^
+  "  Write-Host ('RESULTADO: ATENCAO! ' + $erros + ' arquivo(s) com discrepancia de hash ou ausente.') -ForegroundColor Red; " ^
+  "}; " ^
+  "Write-Host '=====================================================================' -ForegroundColor Cyan; "
+
+echo.
+pause
+"""
+        zf.writestr("verificar_hashes.bat", bat_script)
+
+        # Gera script verificar_hashes.sh (Linux / macOS)
+        sh_script = """#!/usr/bin/env bash
+echo "====================================================================="
+echo "   AUDITORIA DE CUSTÓDIA FORENSE E INTEGRIDADE DE EVIDÊNCIAS"
+echo "   Algoritmo: SHA-256 (NIST FIPS 180-4)"
+echo "====================================================================="
+echo ""
+if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum -c SHA256SUMS.txt
+elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 -c SHA256SUMS.txt
+else
+    echo "Erro: utilitário sha256sum não encontrado no sistema."
+fi
+echo ""
+read -p "Pressione [Enter] para concluir..."
+"""
+        zf.writestr("verificar_hashes.sh", sh_script)
 
     return send_file(zip_path, as_attachment=True, download_name=zip_filename, mimetype="application/zip")
 

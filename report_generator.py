@@ -956,9 +956,16 @@ REPORT_TEMPLATE = """
         </tbody>
     </table>
 
-    <div class="banner-box" style="margin-top: 8px;">
+    <div class="banner-box" style="margin-top: 6px;">
         <strong>TERMO DE CUSTÓDIA E ARMAZENAMENTO DIGITAL:</strong><br>
         Todas as evidências brutas acima listadas encontram-se preservadas sob custódia digital imutável no diretório <code>evidencias/{{ client_id }}/</code> e acompanham este documento consolidado no pacote digital comprimido <code>Evidencias_{{ client_id }}_{{ year }}_{{ "%02d"|format(month) }}.zip</code>.
+    </div>
+
+    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px; padding: 4px 6px; margin-top: 4px; font-size: 6.2pt; color: #334155; line-height: 1.3;">
+        <strong style="color: #0f172a;">PROCEDIMENTO DE AUDITORIA E VERIFICAÇÃO AUTOMÁTICA DE HASH (SHA-256):</strong><br>
+        • <strong>Validação em 1 Clique (Windows):</strong> Descompacte o pacote ZIP oficial e execute o arquivo <code>verificar_hashes.bat</code> para auditar automaticamente todos os arquivos.<br>
+        • <strong>Validação em Lote (Linux / macOS):</strong> No terminal, execute: <code>sha256sum -c SHA256SUMS.txt</code><br>
+        • <strong>Validação Manual (PowerShell / Bash):</strong> <code>Get-FileHash .\arquivo -Algorithm SHA256</code> (Windows) ou <code>sha256sum arquivo</code> (Linux).
     </div>
 
     <table class="signature-table">
