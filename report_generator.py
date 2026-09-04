@@ -676,7 +676,7 @@ REPORT_TEMPLATE = """
         <div class="kpi-card kpi-green">
             <div class="kpi-label">Segurança Perimetral / Firewall</div>
             <div class="kpi-value">100.0%</div>
-            <div class="kpi-sub">✓ Zero Incidentes / Glosas</div>
+            <div class="kpi-sub">✓ Zero Incidentes Confirmados</div>
         </div>
     </div>
 
