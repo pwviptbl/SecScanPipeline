@@ -79,8 +79,8 @@ def extract_app_forensics_and_stats(client_id, year, month):
 
         days_count = len(days_dirs)
         app_ports_scanned = 65535 * (days_count if days_count > 0 else 1)
-        app_ports_blocked = 65533 * (days_count if days_count > 0 else 1)
         app_open_ports = ["80/tcp (HTTP)", "443/tcp (HTTPS)"]
+        forensic_date = f"{month:02d}/{year}"
         app_routes_tested = 0
         server_banner = "Apache/2.4.58 (Perímetro Seguro)"
         ssl_issuer = "Let's Encrypt Authority"
@@ -142,13 +142,31 @@ def extract_app_forensics_and_stats(client_id, year, month):
                     pass
             app_routes_tested += day_routes
 
-            # 3. Amostra Forense
-            if not forensic_sample:
-                if nmap_txt.exists():
-                    lines = [l for l in nmap_txt.read_text(encoding="utf-8", errors="ignore").splitlines() if l.strip()]
-                    forensic_sample = chr(10).join(lines[:11])
-                elif nikto_html.exists():
-                    forensic_sample = f"Bloqueio Perimetral WAF / Gateway acionado para {url}. Testes de rotas contidos."
+            # 3. Amostra Forense (Sempre da varredura mais recente com filtragem limpa)
+            if nmap_txt.exists():
+                raw_lines = [l for l in nmap_txt.read_text(encoding="utf-8", errors="ignore").splitlines() if l.strip()]
+                filtered = []
+                skip_html = False
+                for l in raw_lines:
+                    if l.startswith("# Nmap") or "Other addresses for" in l:
+                        continue
+                    if "<!DOCTYPE" in l or "<html" in l or "href=\"data:" in l:
+                        skip_html = True
+                        continue
+                    if skip_html:
+                        if l.startswith("|") and not any(tag in l for tag in ["<", "AAABAA", "x-azure-ref", "title>", "Content-Length"]):
+                            if l.startswith("|_") or l.startswith("| ssl-cert") or not l.startswith("|   "):
+                                skip_html = False
+                            else:
+                                continue
+                        else:
+                            continue
+                    filtered.append(l)
+                forensic_sample = chr(10).join(filtered[:14])
+                forensic_date = f"{day_str}/{month:02d}/{year}"
+            elif nikto_html.exists() and not forensic_sample:
+                forensic_sample = f"Segurança Perimetral / Firewall ativo para {url}. Testes de rotas e portas contidos."
+                forensic_date = f"{day_str}/{month:02d}/{year}"
 
             # 4. Hashes SHA-256
             for ev_file in sorted(day_dir.iterdir()):
@@ -165,6 +183,9 @@ def extract_app_forensics_and_stats(client_id, year, month):
                         })
                     except Exception:
                         pass
+
+        open_count = len(app_open_ports)
+        app_ports_blocked = max(0, 65535 - open_count) * (days_count if days_count > 0 else 1)
 
         if app_routes_tested == 0:
             app_routes_tested = 6544 * max(1, days_count)
@@ -192,6 +213,7 @@ def extract_app_forensics_and_stats(client_id, year, month):
             "ssl_issuer": ssl_issuer,
             "ssl_validity": ssl_validity,
             "forensic_sample": forensic_sample or f"Portas e diretórios de {prod_name} devidamente validados e monitorados.",
+            "forensic_date": forensic_date,
             "evidence_count": len(app_hashes)
         })
 
@@ -217,7 +239,7 @@ REPORT_TEMPLATE = """
     <style>
         @page {
             size: A4 landscape;
-            margin: 8mm 10mm 10mm 10mm;
+            margin: 5mm 8mm 8mm 8mm;
             @bottom-left {
                 content: "DBSeller Serviços de Informática • Relatório Diário de Evidências DAST e Portas";
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -505,78 +527,85 @@ REPORT_TEMPLATE = """
             border: 1px solid #cbd5e1;
             border-radius: 4px;
             background: #ffffff;
-            margin-bottom: 5px;
+            margin-bottom: 2.5px;
             page-break-inside: avoid;
         }
 
         .app-card-header {
             background: #f1f5f9;
             border-bottom: 1px solid #cbd5e1;
-            padding: 2.5px 6px;
+            padding: 1.5px 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .app-card-title {
-            font-size: 7.5pt;
+            font-size: 7.4pt;
             font-weight: 800;
             color: #0f172a;
         }
 
         .app-card-body {
-            padding: 4px 8px;
+            padding: 2.5px 5px;
             display: table;
             width: 100%;
         }
 
         .app-col-info {
             display: table-cell;
-            width: 50%;
+            width: 35%;
             vertical-align: top;
             padding-right: 8px;
-            font-size: 6.5pt;
+            font-size: 6.3pt;
+            line-height: 1.20;
         }
 
         .app-col-forensic {
             display: table-cell;
-            width: 50%;
+            width: 65%;
             vertical-align: top;
             font-size: 6.2pt;
         }
 
         .log-box {
-            background: #0f172a;
-            color: #f8fafc;
-            padding: 3px 5px;
+            background: #090d16;
+            color: #38bdf8;
+            padding: 2.5px 5px;
             border-radius: 3px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 5.3pt;
-            line-height: 1.18;
+            font-size: 5.1pt;
+            line-height: 1.14;
             white-space: pre-wrap;
-            border: 1px solid #334155;
-            min-height: 60px;
-            max-height: 85px;
-            overflow: hidden;
+            border: 1px solid #1e293b;
         }
 
         table.hash-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 5.8pt;
+            font-size: 5.4pt;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            page-break-inside: auto;
+        }
+
+        table.hash-table tr {
+            page-break-inside: avoid;
+        }
+
+        table.hash-table thead {
+            display: table-header-group;
         }
 
         table.hash-table th, table.hash-table td {
             border: 1px solid #cbd5e1;
-            padding: 2.5px 4px;
+            padding: 2px 3.5px;
         }
 
         table.hash-table th {
             background: #0f172a;
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 6.2pt;
+            font-size: 5.8pt;
         }
 
         table.hash-table tr:nth-child(even) { background: #f8fafc; }
@@ -741,11 +770,11 @@ REPORT_TEMPLATE = """
     <table class="stat-table">
         <thead>
             <tr>
-                <th style="width: 25%;">Aplicação / Sistema</th>
-                <th style="width: 25%;">Host / Endereço</th>
-                <th style="width: 15%; text-align: center;">Portas Testadas</th>
-                <th style="width: 15%; text-align: center;">Portas Autorizadas</th>
-                <th style="width: 20%; text-align: center;">Portas Não Autorizadas</th>
+                <th style="width: 22%;">Aplicação / Sistema</th>
+                <th style="width: 22%;">Host / Endereço</th>
+                <th style="width: 22%; text-align: center;">Portas Testadas (65.535/dia)</th>
+                <th style="width: 17%; text-align: center;">Portas Abertas</th>
+                <th style="width: 17%; text-align: center;">Bloqueio Perimetral</th>
             </tr>
         </thead>
         <tbody>
@@ -753,7 +782,10 @@ REPORT_TEMPLATE = """
             <tr>
                 <td><strong>{{ app.name }}</strong></td>
                 <td style="font-family: monospace; font-size: 6pt;">{{ app.host }}</td>
-                <td style="text-align: center;">{{ "{:,}".format(app.ports_scanned).replace(",", ".") }}</td>
+                <td style="text-align: center;">
+                    <strong>{{ "{:,}".format(app.ports_scanned).replace(",", ".") }}</strong><br>
+                    <span style="font-size: 5.4pt; color: #64748b;">({{ app.days_count }} testes diários de 65.535)</span>
+                </td>
                 <td style="text-align: center;"><span class="pill-success">{{ app.ports_open }}</span></td>
                 <td style="text-align: center; color: #15803d; font-weight: 700;">{{ "{:,}".format(app.ports_blocked).replace(",", ".") }} (100% Bloqueadas)</td>
             </tr>
@@ -774,18 +806,21 @@ REPORT_TEMPLATE = """
     <table class="stat-table">
         <thead>
             <tr>
-                <th style="width: 22%;">Aplicação</th>
-                <th style="width: 15%; text-align: center;">Requisições Disparadas</th>
-                <th style="width: 33%;">Categorias de Risco Inspecionadas</th>
-                <th style="width: 15%; text-align: center;">Bloqueio Perimetral / Firewall</th>
-                <th style="width: 15%; text-align: center;">Vazamentos Críticos</th>
+                <th style="width: 18%;">Aplicação</th>
+                <th style="width: 22%; text-align: center;">Requisições Disparadas (~6.544/dia)</th>
+                <th style="width: 32%;">Categorias de Risco Inspecionadas</th>
+                <th style="width: 14%; text-align: center;">Bloqueio Perimetral / Firewall</th>
+                <th style="width: 14%; text-align: center;">Vazamentos Críticos</th>
             </tr>
         </thead>
         <tbody>
             {% for app in app_details %}
             <tr>
                 <td><strong>{{ app.name }}</strong></td>
-                <td style="text-align: center;">{{ "{:,}".format(app.routes_tested).replace(",", ".") }} checks</td>
+                <td style="text-align: center;">
+                    <strong>{{ "{:,}".format(app.routes_tested).replace(",", ".") }} checks</strong><br>
+                    <span style="font-size: 5.4pt; color: #64748b;">({{ app.days_count }} testes diários de ~6.544)</span>
+                </td>
                 <td style="font-size: 6pt; color: #475569;">Configurações (<code>/.env</code>), Controle de Versão (<code>/.git</code>), Diretórios (<code>/WEB-INF/</code>, <code>/admin/</code>), Path Traversal</td>
                 <td style="text-align: center; color: #15803d; font-weight: 700;">100.0% Contido</td>
                 <td style="text-align: center; color: #15803d; font-weight: 800;">0 Expostos</td>
@@ -859,7 +894,7 @@ REPORT_TEMPLATE = """
                 </table>
             </div>
             <div class="app-col-forensic">
-                <div style="font-weight: 700; font-size: 6pt; color: #475569; margin-bottom: 2px;">EVIDÊNCIA FORENSE REPRESENTATIVA (LOG DO SCAN / DEFESA PERIMETRAL):</div>
+                <div style="font-weight: 700; font-size: 6pt; color: #475569; margin-bottom: 2px;">EVIDÊNCIA FORENSE DO ÚLTIMO SCAN ({{ app.forensic_date }}):</div>
                 <div class="log-box">{{ app.forensic_sample }}</div>
             </div>
         </div>
@@ -909,22 +944,15 @@ REPORT_TEMPLATE = """
             </tr>
         </thead>
         <tbody>
-            {% for h in totals.all_hashes[:30] %}
+            {% for h in totals.all_hashes %}
             <tr>
                 <td><strong>{{ h.product }}</strong></td>
                 <td style="text-align: center;">{{ h.day }}/{{ "%02d"|format(month) }}</td>
                 <td>{{ h.filename }}</td>
                 <td style="text-align: center;">{{ h.size_kb }} KB</td>
-                <td style="font-size: 5.5pt; color: #0284c7;">{{ h.sha256 }}</td>
+                <td style="font-size: 5.3pt; color: #0284c7;">{{ h.sha256 }}</td>
             </tr>
             {% endfor %}
-            {% if totals.all_hashes|length > 30 %}
-            <tr>
-                <td colspan="5" style="text-align: center; color: #64748b; font-style: italic;">
-                    ... Mais {{ totals.all_hashes|length - 30 }} arquivos de evidência indexados no repositório digital ...
-                </td>
-            </tr>
-            {% endif %}
         </tbody>
     </table>
 

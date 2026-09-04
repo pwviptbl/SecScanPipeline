@@ -137,7 +137,13 @@ def api_generate_pdf():
     month = int(request.args.get("month", datetime.now().month))
     report_type = request.args.get("type", "full")
     
-    pdf_path = generate_pdf_report(client_id, year, month, report_type=report_type)
+    try:
+        import importlib
+        import report_generator
+        importlib.reload(report_generator)
+        pdf_path = report_generator.generate_pdf_report(client_id, year, month, report_type=report_type)
+    except Exception:
+        pdf_path = generate_pdf_report(client_id, year, month, report_type=report_type)
     filename = Path(pdf_path).name
     return send_file(pdf_path, as_attachment=True, download_name=filename, mimetype="application/pdf")
 
