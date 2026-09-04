@@ -628,12 +628,12 @@ REPORT_TEMPLATE = """
 
         .signature-cell {
             text-align: center;
-            width: 220px;
+            width: 280px;
             margin: 0 auto;
         }
 
-        .signature-space { height: 22px; }
-        .signature-line { border-top: 1px solid #64748b; margin-bottom: 2px; }
+        .signature-space { height: 52px; }
+        .signature-line { border-top: 1px solid #64748b; margin-bottom: 3px; }
     </style>
 </head>
 <body>
@@ -736,7 +736,7 @@ REPORT_TEMPLATE = """
                 <div class="signature-cell">
                     <div class="signature-space"></div>
                     <div class="signature-line"></div>
-                    <div style="font-weight: 700; font-size: 7.5pt; color: #0f172a;">Gerente de TI</div>
+                    <div style="font-weight: 700; font-size: 7.5pt; color: #0f172a;">Analista de Segurança da Informação</div>
                     <div style="font-size: 6.5pt; color: #64748b;">DBSeller Serviços de Informática Ltda.</div>
                 </div>
             </td>
@@ -967,7 +967,7 @@ REPORT_TEMPLATE = """
                 <div class="signature-cell">
                     <div class="signature-space"></div>
                     <div class="signature-line"></div>
-                    <div style="font-weight: 700; font-size: 7.5pt; color: #0f172a;">Gerente de Segurança da Informação & Compliance</div>
+                    <div style="font-weight: 700; font-size: 7.5pt; color: #0f172a;">Analista de Segurança da Informação</div>
                     <div style="font-size: 6.5pt; color: #64748b;">DBSeller Serviços de Informática Ltda.</div>
                 </div>
             </td>

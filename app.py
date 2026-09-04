@@ -215,6 +215,17 @@ def api_export_zip():
                                 rel_path = full_path.relative_to(EVIDENCIAS_DIR)
                                 zf.write(full_path, arcname=str(rel_path))
 
+        # Inclui o Relatório PDF Completo oficial correspondente dentro do ZIP
+        try:
+            import importlib
+            import report_generator
+            importlib.reload(report_generator)
+            pdf_path = report_generator.generate_pdf_report(client_id, int(year), int(month), report_type="full")
+            if pdf_path and Path(pdf_path).exists():
+                zf.write(pdf_path, arcname=Path(pdf_path).name)
+        except Exception as e:
+            print(f"[!] Aviso: Nao foi possivel incluir o PDF no ZIP: {e}")
+
     return send_file(zip_path, as_attachment=True, download_name=zip_filename, mimetype="application/zip")
 
 @app.route("/api/run-pipeline", methods=["POST"])
