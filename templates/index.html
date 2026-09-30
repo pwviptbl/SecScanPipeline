@@ -164,13 +164,24 @@
                     </thead>
                     <tbody class="divide-y divide-slate-700/60">
                         {% for prod in matrix %}
+                            {% set applicable_tools = [] %}
                             {% for tool_key, tool_label, tool_icon in [('nmap', 'Nmap', 'fa-network-wired'), ('nikto', 'Nikto', 'fa-server'), ('owasp_zap', 'OWASP', 'fa-spider')] %}
+                                {% if not prod.tools_list or tool_key in prod.tools_list %}
+                                    {% set _ = applicable_tools.append((tool_key, tool_label, tool_icon)) %}
+                                {% endif %}
+                            {% endfor %}
+                            {% for tool_key, tool_label, tool_icon in applicable_tools %}
                             <tr class="hover:bg-slate-750/50 transition">
                                 {% if loop.first %}
-                                <td class="py-2.5 px-4 text-left font-bold text-white bg-slate-850/80 sticky left-0 z-10 border-r border-slate-700 border-b border-slate-700" rowspan="3">
+                                <td class="py-2.5 px-4 text-left font-bold text-white bg-slate-850/80 sticky left-0 z-10 border-r border-slate-700 border-b border-slate-700" rowspan="{{ applicable_tools|length }}">
                                     <div class="flex items-center gap-2">
                                         <i class="fa-solid fa-cube text-sky-400"></i>
                                         <span>{{ prod.name }}</span>
+                                        {% if prod.tipo == 'database' %}
+                                        <span class="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-mono font-normal">SGBD</span>
+                                        {% elif prod.tipo == 'backend_app' %}
+                                        <span class="text-[9px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded font-mono font-normal">BACKEND</span>
+                                        {% endif %}
                                     </div>
                                 </td>
                                 {% endif %}

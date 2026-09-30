@@ -59,13 +59,15 @@ def index():
     
     matrix = get_monthly_matrix(client_id, year, month)
     
-    # Se uma aplicação não tiver scans ainda, inclui ela vazia a partir do targets.json se estiver em vigência
     client_obj = next((c for c in clientes if c["id"] == client_id), None)
+    prod_config_map = {}
     if client_obj:
+        for p in client_obj.get("produtos", []):
+            prod_config_map[p["nome"]] = p
+
         existing_prods = {p["name"] for p in matrix}
         for p in client_obj.get("produtos", []):
             vigencia = p.get("vigencia_inicio")
-            # Se tiver vigencia futura em relacao ao mes consultado, nao exibe no mes anterior
             if vigencia:
                 try:
                     v_year, v_month, _ = map(int, vigencia.split("-"))
@@ -77,9 +79,16 @@ def index():
             if p["nome"] not in existing_prods:
                 matrix.append({
                     "name": p["nome"],
-                    "tools": {"nmap": {}, "nikto": {}, "owasp_zap": {}}
+                    "tools": {"nmap": {}, "nikto": {}, "owasp_zap": {}},
+                    "tools_list": p.get("tools", ["nmap", "nikto", "owasp_zap"]),
+                    "tipo": p.get("tipo", "web")
                 })
-                
+
+    for prod in matrix:
+        cfg = prod_config_map.get(prod["name"], {})
+        prod["tools_list"] = cfg.get("tools", ["nmap", "nikto", "owasp_zap"])
+        prod["tipo"] = cfg.get("tipo", "web")
+
     # Ordena por nome da aplicação
     matrix = sorted(matrix, key=lambda x: x["name"])
     
