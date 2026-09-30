@@ -12,7 +12,9 @@ import json
 import zipfile
 import calendar
 import tempfile
+import threading
 import subprocess
+import hashlib
 from pathlib import Path
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
@@ -23,9 +25,16 @@ from report_generator import generate_pdf_report, MONTH_NAMES_PT
 BASE_DIR = Path(__file__).resolve().parent
 EVIDENCIAS_DIR = BASE_DIR / "evidencias"
 CONFIG_FILE = BASE_DIR / "config" / "targets.json"
+REPORTS_DIR = BASE_DIR / "reports"
+PACKAGES_DIR = REPORTS_DIR / "pacotes"
+
+PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__)
 app.secret_key = "dbseller-secscanner-portal-secret"
+
+# Estado de compilação em background para pacotes
+BUILD_TASKS = {}
 
 def load_targets():
     if CONFIG_FILE.exists():
@@ -50,11 +59,21 @@ def index():
     
     matrix = get_monthly_matrix(client_id, year, month)
     
-    # Se uma aplicação não tiver scans ainda, inclui ela vazia a partir do targets.json
+    # Se uma aplicação não tiver scans ainda, inclui ela vazia a partir do targets.json se estiver em vigência
     client_obj = next((c for c in clientes if c["id"] == client_id), None)
     if client_obj:
         existing_prods = {p["name"] for p in matrix}
         for p in client_obj.get("produtos", []):
+            vigencia = p.get("vigencia_inicio")
+            # Se tiver vigencia futura em relacao ao mes consultado, nao exibe no mes anterior
+            if vigencia:
+                try:
+                    v_year, v_month, _ = map(int, vigencia.split("-"))
+                    if year < v_year or (year == v_year and month < v_month):
+                        continue
+                except Exception:
+                    pass
+
             if p["nome"] not in existing_prods:
                 matrix.append({
                     "name": p["nome"],
@@ -136,7 +155,13 @@ def api_generate_pdf():
     year = int(request.args.get("year", datetime.now().year))
     month = int(request.args.get("month", datetime.now().month))
     report_type = request.args.get("type", "full")
+    force = request.args.get("force", "false").lower() == "true"
     
+    # Se ja existir e nao for force, entrega instantaneo
+    cached_pdf = REPORTS_DIR / str(year) / f"{month:02d}" / f"Relatorio_Mensal_{'Completo' if report_type == 'full' else 'Resumo'}_{client_id}_{year}_{month:02d}.pdf"
+    if cached_pdf.exists() and not force:
+        return send_file(cached_pdf, as_attachment=True, download_name=cached_pdf.name, mimetype="application/pdf")
+
     try:
         import importlib
         import report_generator
@@ -147,75 +172,28 @@ def api_generate_pdf():
     filename = Path(pdf_path).name
     return send_file(pdf_path, as_attachment=True, download_name=filename, mimetype="application/pdf")
 
-@app.route("/api/export-zip")
-def api_export_zip():
+def _compile_zip_package(client_id, year, month):
     """
-    Exporta evidências em arquivo ZIP:
-    - scope: 'all' (tudo), 'month' (todo o mês), 'product_month' (aplicação no mês), 'product_day' (aplicação no dia)
+    Funcao executada em background para compilar o ZIP completo oficial e colocar em cache.
     """
-    import hashlib
-    scope = request.args.get("scope", "month")
-    client_id = request.args.get("client", "Niteroi")
-    product = request.args.get("product", "")
-    year = request.args.get("year", datetime.now().strftime("%Y"))
-    month = request.args.get("month", datetime.now().strftime("%m"))
-    day = request.args.get("day", "")
-    
-    # Formata mês com 2 dígitos
-    if month.isdigit():
-        month = f"{int(month):02d}"
-    if day.isdigit():
-        day = f"{int(day):02d}"
+    task_key = f"{client_id}_{year}_{month:02d}"
+    try:
+        BUILD_TASKS[task_key] = {"status": "compiling", "progress": "Iniciando compilação do pacote..."}
         
-    temp_zip = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
-    zip_path = temp_zip.name
-    temp_zip.close()
-    
-    zip_filename = f"Evidencias_{client_id}"
-    files_to_hash = []
+        target_filename = f"Evidencias_{client_id}_{year}_{month:02d}_Consolidado.zip"
+        target_dest = PACKAGES_DIR / target_filename
+        temp_zip = PACKAGES_DIR / f".temp_{target_filename}"
 
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        if scope == "all":
-            zip_filename = f"Evidencias_Todas_Aplicacoes_Consolidado.zip"
-            for root, _, files in os.walk(EVIDENCIAS_DIR):
-                for file in files:
-                    full_path = Path(root) / file
-                    rel_path = full_path.relative_to(EVIDENCIAS_DIR)
-                    zf.write(full_path, arcname=str(rel_path))
-                    sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
-                    files_to_hash.append((sha, str(rel_path)))
-                    
-        elif scope == "product_day" and product and day:
-            target_path = EVIDENCIAS_DIR / client_id / product / str(year) / str(month) / str(day)
-            zip_filename = f"Evidencias_{client_id}_{product}_{year}_{month}_{day}.zip"
-            if target_path.exists():
-                for root, _, files in os.walk(target_path):
-                    for file in files:
-                        full_path = Path(root) / file
-                        rel_path = full_path.relative_to(EVIDENCIAS_DIR)
-                        zf.write(full_path, arcname=str(rel_path))
-                        sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
-                        files_to_hash.append((sha, str(rel_path)))
-                        
-        elif scope == "product_month" and product:
-            target_path = EVIDENCIAS_DIR / client_id / product / str(year) / str(month)
-            zip_filename = f"Evidencias_{client_id}_{product}_{year}_{month}.zip"
-            if target_path.exists():
-                for root, _, files in os.walk(target_path):
-                    for file in files:
-                        full_path = Path(root) / file
-                        rel_path = full_path.relative_to(EVIDENCIAS_DIR)
-                        zf.write(full_path, arcname=str(rel_path))
-                        sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
-                        files_to_hash.append((sha, str(rel_path)))
-                        
-        else: # scope == 'month'
-            zip_filename = f"Evidencias_{client_id}_{year}_{month}_Todos_Produtos.zip"
-            client_path = EVIDENCIAS_DIR / client_id
+        files_to_hash = []
+        client_path = EVIDENCIAS_DIR / client_id
+
+        BUILD_TASKS[task_key]["progress"] = "Indexando evidências e calculando hashes SHA-256..."
+        
+        with zipfile.ZipFile(temp_zip, "w", zipfile.ZIP_DEFLATED) as zf:
             if client_path.exists():
                 for prod_dir in client_path.iterdir():
                     if not prod_dir.is_dir(): continue
-                    target_month = prod_dir / str(year) / str(month)
+                    target_month = prod_dir / str(year) / f"{month:02d}"
                     if target_month.exists():
                         for root, _, files in os.walk(target_month):
                             for file in files:
@@ -225,28 +203,29 @@ def api_export_zip():
                                 sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
                                 files_to_hash.append((sha, str(rel_path)))
 
-        # Inclui o Relatório PDF Completo oficial correspondente dentro do ZIP
-        try:
-            import importlib
-            import report_generator
-            importlib.reload(report_generator)
-            pdf_path = report_generator.generate_pdf_report(client_id, int(year), int(month), report_type="full")
-            if pdf_path and Path(pdf_path).exists():
-                pdf_bytes = Path(pdf_path).read_bytes()
-                pdf_arcname = Path(pdf_path).name
-                zf.write(pdf_path, arcname=pdf_arcname)
-                pdf_sha = hashlib.sha256(pdf_bytes).hexdigest()
-                files_to_hash.insert(0, (pdf_sha, pdf_arcname))
-        except Exception as e:
-            print(f"[!] Aviso: Nao foi possivel incluir o PDF no ZIP: {e}")
+            # Inclui o Relatório PDF Completo oficial correspondente dentro do ZIP
+            BUILD_TASKS[task_key]["progress"] = "Compilando relatório oficial em PDF..."
+            try:
+                import importlib
+                import report_generator
+                importlib.reload(report_generator)
+                pdf_path = report_generator.generate_pdf_report(client_id, int(year), int(month), report_type="full")
+                if pdf_path and Path(pdf_path).exists():
+                    pdf_bytes = Path(pdf_path).read_bytes()
+                    pdf_arcname = Path(pdf_path).name
+                    zf.write(pdf_path, arcname=pdf_arcname)
+                    pdf_sha = hashlib.sha256(pdf_bytes).hexdigest()
+                    files_to_hash.insert(0, (pdf_sha, pdf_arcname))
+            except Exception as e:
+                print(f"[!] Aviso: Nao foi possivel incluir o PDF no ZIP: {e}")
 
-        # Gera SHA256SUMS.txt
-        if files_to_hash:
-            checksum_content = "\n".join([f"{sha}  {path}" for sha, path in files_to_hash]) + "\n"
-            zf.writestr("SHA256SUMS.txt", checksum_content)
+            # Gera SHA256SUMS.txt
+            if files_to_hash:
+                checksum_content = "\n".join([f"{sha}  {path}" for sha, path in files_to_hash]) + "\n"
+                zf.writestr("SHA256SUMS.txt", checksum_content)
 
-        # Gera script verificar_hashes.bat (Windows 1-clique)
-        bat_script = """@echo off
+            # Gera script verificar_hashes.bat (Windows 1-clique)
+            bat_script = """@echo off
 chcp 65001 >nul
 title Auditoria de Custodia e Integridade - SecScannerPipeline
 cls
@@ -295,10 +274,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
 echo.
 pause
 """
-        zf.writestr("verificar_hashes.bat", bat_script)
+            zf.writestr("verificar_hashes.bat", bat_script)
 
-        # Gera script verificar_hashes.sh (Linux / macOS)
-        sh_script = """#!/usr/bin/env bash
+            # Gera script verificar_hashes.sh (Linux / macOS)
+            sh_script = """#!/usr/bin/env bash
 echo "====================================================================="
 echo "   AUDITORIA DE CUSTÓDIA FORENSE E INTEGRIDADE DE EVIDÊNCIAS"
 echo "   Algoritmo: SHA-256 (NIST FIPS 180-4)"
@@ -314,7 +293,161 @@ fi
 echo ""
 read -p "Pressione [Enter] para concluir..."
 """
-        zf.writestr("verificar_hashes.sh", sh_script)
+            zf.writestr("verificar_hashes.sh", sh_script)
+
+        # Move o temp para o destino final
+        if temp_zip.exists():
+            temp_zip.replace(target_dest)
+
+        BUILD_TASKS[task_key] = {"status": "ready", "filename": target_filename}
+    except Exception as e:
+        BUILD_TASKS[task_key] = {"status": "error", "error": str(e)}
+
+@app.route("/api/package-status")
+def api_package_status():
+    """
+    Retorna o status do pacote compilado para download instantaneo.
+    """
+    client_id = request.args.get("client", "Niteroi")
+    year = int(request.args.get("year", datetime.now().year))
+    month = int(request.args.get("month", datetime.now().month))
+    
+    target_filename = f"Evidencias_{client_id}_{year}_{month:02d}_Consolidado.zip"
+    target_dest = PACKAGES_DIR / target_filename
+    
+    task_key = f"{client_id}_{year}_{month:02d}"
+    task = BUILD_TASKS.get(task_key, {})
+
+    exists = target_dest.exists()
+    size_mb = round(target_dest.stat().st_size / (1024 * 1024), 2) if exists else 0
+    mtime = datetime.fromtimestamp(target_dest.stat().st_mtime).strftime("%d/%m/%Y %H:%M") if exists else None
+
+    # Status do PDF
+    pdf_filename = f"Relatorio_Mensal_Completo_{client_id}_{year}_{month:02d}.pdf"
+    cached_pdf = REPORTS_DIR / str(year) / f"{month:02d}" / pdf_filename
+    pdf_exists = cached_pdf.exists()
+    pdf_mtime = datetime.fromtimestamp(cached_pdf.stat().st_mtime).strftime("%d/%m/%Y %H:%M") if pdf_exists else None
+    pdf_size_kb = round(cached_pdf.stat().st_size / 1024, 1) if pdf_exists else 0
+
+    return jsonify({
+        "zip": {
+            "exists": exists,
+            "filename": target_filename,
+            "size_mb": size_mb,
+            "updated_at": mtime,
+            "task_status": task.get("status", "ready" if exists else "none"),
+            "progress": task.get("progress", "")
+        },
+        "pdf": {
+            "exists": pdf_exists,
+            "filename": pdf_filename,
+            "size_kb": pdf_size_kb,
+            "updated_at": pdf_mtime
+        }
+    })
+
+@app.route("/api/compile-package", methods=["POST"])
+def api_compile_package():
+    """
+    Dispara a compilação do pacote ZIP e PDF em segundo plano.
+    """
+    client_id = request.args.get("client", "Niteroi")
+    year = int(request.args.get("year", datetime.now().year))
+    month = int(request.args.get("month", datetime.now().month))
+    
+    task_key = f"{client_id}_{year}_{month:02d}"
+    if BUILD_TASKS.get(task_key, {}).get("status") == "compiling":
+        return jsonify({"success": True, "message": "Compilação já em andamento em segundo plano!"})
+
+    t = threading.Thread(target=_compile_zip_package, args=(client_id, year, month), daemon=True)
+    t.start()
+
+    return jsonify({"success": True, "message": "Geração do pacote iniciada em segundo plano!"})
+
+@app.route("/api/download-package")
+def api_download_package():
+    """
+    Download direto e instantâneo do pacote ZIP pré-gerado.
+    """
+    client_id = request.args.get("client", "Niteroi")
+    year = int(request.args.get("year", datetime.now().year))
+    month = int(request.args.get("month", datetime.now().month))
+    
+    target_filename = f"Evidencias_{client_id}_{year}_{month:02d}_Consolidado.zip"
+    target_dest = PACKAGES_DIR / target_filename
+    
+    if not target_dest.exists():
+        # Se nao existe ainda, gera síncrono e entrega
+        _compile_zip_package(client_id, year, month)
+        
+    return send_file(target_dest, as_attachment=True, download_name=target_filename, mimetype="application/zip")
+
+@app.route("/api/export-zip")
+def api_export_zip():
+    """
+    Exporta evidências em arquivo ZIP direto ou redireciona para o pacote compilado se for month.
+    """
+    scope = request.args.get("scope", "month")
+    client_id = request.args.get("client", "Niteroi")
+    product = request.args.get("product", "")
+    year = request.args.get("year", datetime.now().strftime("%Y"))
+    month = request.args.get("month", datetime.now().strftime("%m"))
+    day = request.args.get("day", "")
+    
+    if month.isdigit():
+        month = f"{int(month):02d}"
+    if day.isdigit():
+        day = f"{int(day):02d}"
+
+    # Se for o mes completo, utiliza o endpoint de download com cache instantaneo
+    if scope == "month" and not product:
+        return redirect(f"/api/download-package?client={client_id}&year={year}&month={month}")
+        
+    temp_zip = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    zip_path = temp_zip.name
+    temp_zip.close()
+    
+    zip_filename = f"Evidencias_{client_id}"
+    files_to_hash = []
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        if scope == "all":
+            zip_filename = f"Evidencias_Todas_Aplicacoes_Consolidado.zip"
+            for root, _, files in os.walk(EVIDENCIAS_DIR):
+                for file in files:
+                    full_path = Path(root) / file
+                    rel_path = full_path.relative_to(EVIDENCIAS_DIR)
+                    zf.write(full_path, arcname=str(rel_path))
+                    sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
+                    files_to_hash.append((sha, str(rel_path)))
+                    
+        elif scope == "product_day" and product and day:
+            target_path = EVIDENCIAS_DIR / client_id / product / str(year) / str(month) / str(day)
+            zip_filename = f"Evidencias_{client_id}_{product}_{year}_{month}_{day}.zip"
+            if target_path.exists():
+                for root, _, files in os.walk(target_path):
+                    for file in files:
+                        full_path = Path(root) / file
+                        rel_path = full_path.relative_to(EVIDENCIAS_DIR)
+                        zf.write(full_path, arcname=str(rel_path))
+                        sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
+                        files_to_hash.append((sha, str(rel_path)))
+                        
+        elif scope == "product_month" and product:
+            target_path = EVIDENCIAS_DIR / client_id / product / str(year) / str(month)
+            zip_filename = f"Evidencias_{client_id}_{product}_{year}_{month}.zip"
+            if target_path.exists():
+                for root, _, files in os.walk(target_path):
+                    for file in files:
+                        full_path = Path(root) / file
+                        rel_path = full_path.relative_to(EVIDENCIAS_DIR)
+                        zf.write(full_path, arcname=str(rel_path))
+                        sha = hashlib.sha256(full_path.read_bytes()).hexdigest()
+                        files_to_hash.append((sha, str(rel_path)))
+
+        if files_to_hash:
+            checksum_content = "\n".join([f"{sha}  {path}" for sha, path in files_to_hash]) + "\n"
+            zf.writestr("SHA256SUMS.txt", checksum_content)
 
     return send_file(zip_path, as_attachment=True, download_name=zip_filename, mimetype="application/zip")
 

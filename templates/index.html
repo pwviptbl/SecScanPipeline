@@ -73,15 +73,15 @@
             </form>
 
             <div class="flex items-center space-x-2">
-                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}&type=summary" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Gera apenas a Matriz Diária de 1 página com parecer assinado">
-                    <i class="fa-solid fa-table-cells"></i> Matriz Resumida (PDF 1 pág)
-                </a>
-                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}&type=full" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Gera o Relatório Técnico Completo Multi-Nível (7 páginas com estatísticas DAST, amostragem e custódia SHA-256)">
-                    <i class="fa-solid fa-file-pdf"></i> Relatório Completo (PDF 7 págs)
-                </a>
-                <button onclick="openZipModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-file-zipper"></i> Exportar ZIP
+                <button onclick="openPackagesModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Central de Downloads Instantâneos e Compilação de Pacotes">
+                    <i class="fa-solid fa-folder-open"></i> Central de Arquivos
                 </button>
+                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}&type=summary" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Gera apenas a Matriz Diária de 1 página com parecer">
+                    <i class="fa-solid fa-table-cells"></i> Matriz (PDF)
+                </a>
+                <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}&type=full" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Gera o Relatório Técnico Completo Multi-Nível Oficial">
+                    <i class="fa-solid fa-file-pdf"></i> Relatório PDF
+                </a>
                 <button onclick="openHashModal()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow transition flex items-center gap-1.5" title="Verificar Autenticidade e Hash SHA-256 de Evidência">
                     <i class="fa-solid fa-fingerprint"></i> Validar Hash
                 </button>
@@ -248,43 +248,85 @@
         </div>
     </div>
 
-    <!-- Modal Exportar ZIP -->
-    <div id="zipModal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+    <!-- Modal Central de Arquivos e Downloads Instantâneos -->
+    <div id="packagesModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-2xl w-full overflow-hidden shadow-2xl">
             <div class="px-5 py-3.5 border-b border-slate-700 flex items-center justify-between bg-slate-850">
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-file-zipper text-indigo-400"></i> Exportar ZIP de Evidências
+                    <i class="fa-solid fa-folder-open text-indigo-400"></i> Central de Arquivos e Pacotes • {{ month_name }}/{{ year }}
                 </h3>
-                <button onclick="closeZipModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+                <button onclick="closePackagesModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
             </div>
             <div class="p-5 space-y-4 text-xs">
-                <p class="text-slate-300">Escolha o escopo das evidências brutas para download em arquivo comprimido ZIP:</p>
-                
-                <div class="space-y-2">
-                    <!-- Opção 1: Todas no Mês Atual -->
-                    <a href="/api/export-zip?scope=month&client={{ client_id }}&year={{ year }}&month={{ month }}" 
-                       class="block p-3 rounded-lg border border-slate-700 hover:border-indigo-500 bg-slate-900/60 hover:bg-indigo-950/30 transition">
-                        <strong class="text-white block">📦 Todas as Aplicações do Mês ({{ month_name }}/{{ year }})</strong>
-                        <span class="text-slate-400 text-[11px]">Baixa todas as evidências (Nmap, Nikto, ZAP) de todas as aplicações no mês selecionado.</span>
-                    </a>
+                <div class="bg-slate-900/80 border border-slate-700/80 rounded-lg p-3 text-slate-300 flex items-center justify-between">
+                    <div>
+                        <div class="font-bold text-white text-sm">Download Instantâneo</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">Os arquivos compilados ficam armazenados em cache local, permitindo download direto sem travar a navegação.</div>
+                    </div>
+                    <button onclick="requestCompilePackage()" id="btnCompile" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shadow">
+                        <i class="fa-solid fa-arrows-rotate"></i> Recompilar Agora
+                    </button>
+                </div>
 
-                    <!-- Opção 2: Todas em Todos os Meses -->
-                    <a href="/api/export-zip?scope=all&client={{ client_id }}" 
-                       class="block p-3 rounded-lg border border-slate-700 hover:border-indigo-500 bg-slate-900/60 hover:bg-indigo-950/30 transition">
-                        <strong class="text-white block">🗄️ Todas as Aplicações de Todos os Meses (Consolidado)</strong>
-                        <span class="text-slate-400 text-[11px]">Baixa o repositório completo com todos os anos, meses e dias de evidências.</span>
-                    </a>
+                <!-- Lista de Arquivos do Mês -->
+                <div class="space-y-3">
+                    <!-- Item 1: Pacote ZIP Consolidado -->
+                    <div class="border border-slate-700 rounded-xl p-3 bg-slate-850 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-lg">
+                                <i class="fa-solid fa-file-zipper"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-white" id="zipPkgTitle">Pacote Oficial de Evidências (ZIP)</div>
+                                <div class="text-[11px] text-slate-400" id="zipPkgDesc">Inclui todas as evidências diárias, relatório PDF e scripts de validação de hash SHA-256.</div>
+                                <div class="text-[10px] text-sky-400 font-mono mt-0.5" id="zipPkgMeta">Verificando cache...</div>
+                            </div>
+                        </div>
+                        <div>
+                            <a id="btnDownloadZipPkg" href="/api/download-package?client={{ client_id }}&year={{ year }}&month={{ month }}" 
+                               class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2 rounded-lg text-xs transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-download"></i> Baixar ZIP
+                            </a>
+                        </div>
+                    </div>
 
-                    <!-- Opção 3: Aplicação Específica -->
-                    <div class="p-3 rounded-lg border border-slate-700 bg-slate-900/60 space-y-2">
-                        <strong class="text-white block">🎯 Aplicação Específica no Mês</strong>
-                        <div class="flex gap-2">
-                            <select id="zipProdSelect" class="bg-slate-950 border border-slate-600 rounded px-2 py-1 text-white text-xs w-full">
+                    <!-- Item 2: Relatório PDF Completo Multi-Nível -->
+                    <div class="border border-slate-700 rounded-xl p-3 bg-slate-850 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center text-lg">
+                                <i class="fa-solid fa-file-pdf"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-white">Relatório Técnico Completo Multi-Nível (PDF)</div>
+                                <div class="text-[11px] text-slate-400">Consolidado Executivo (Nível 1 a 4), métricas DAST, amostragem e cadeia de custódia.</div>
+                                <div class="text-[10px] text-sky-400 font-mono mt-0.5" id="pdfPkgMeta">Pronto para emissão</div>
+                            </div>
+                        </div>
+                        <div>
+                            <a href="/api/generate-pdf?client={{ client_id }}&year={{ year }}&month={{ month }}&type=full" 
+                               class="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-4 py-2 rounded-lg text-xs transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-download"></i> Baixar PDF
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Outras Opções de Exportação -->
+                <div class="border-t border-slate-700 pt-3">
+                    <div class="font-semibold text-slate-300 text-xs mb-2">Exportações Específicas / Parciais:</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <a href="/api/export-zip?scope=all&client={{ client_id }}" 
+                           class="p-2.5 rounded-lg border border-slate-700 hover:border-slate-500 bg-slate-900/60 transition block">
+                            <strong class="text-white block text-[11px]">🗄️ Repositório Histórico Completo</strong>
+                            <span class="text-slate-400 text-[10px]">Todos os meses e anos acumulados</span>
+                        </a>
+                        <div class="p-2.5 rounded-lg border border-slate-700 bg-slate-900/60 flex items-center gap-2">
+                            <select id="zipProdSelect" class="bg-slate-950 border border-slate-600 rounded px-2 py-1 text-white text-[11px] w-full">
                                 {% for prod in matrix %}
                                 <option value="{{ prod.name }}">{{ prod.name }}</option>
                                 {% endfor %}
                             </select>
-                            <button onclick="downloadProductZip()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1 rounded text-xs">
+                            <button onclick="downloadProductZip()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 py-1 rounded text-[11px]">
                                 Baixar
                             </button>
                         </div>
@@ -292,7 +334,7 @@
                 </div>
             </div>
             <div class="px-5 py-3 border-t border-slate-700 bg-slate-850 flex justify-end">
-                <button onclick="closeZipModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-xs font-medium transition">
+                <button onclick="closePackagesModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-md text-xs font-medium transition">
                     Fechar
                 </button>
             </div>
@@ -414,16 +456,83 @@
             });
         }
 
-        function closeDetailModal() {
-            document.getElementById('detailModal').classList.add('hidden');
+        let pollInterval = null;
+
+        function openPackagesModal() {
+            document.getElementById('packagesModal').classList.remove('hidden');
+            updatePackageStatus();
         }
 
-        function openZipModal() {
-            document.getElementById('zipModal').classList.remove('hidden');
+        function closePackagesModal() {
+            document.getElementById('packagesModal').classList.add('hidden');
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
         }
 
-        function closeZipModal() {
-            document.getElementById('zipModal').classList.add('hidden');
+        function updatePackageStatus() {
+            fetch(`/api/package-status?client={{ client_id }}&year={{ year }}&month={{ month }}`)
+                .then(r => r.json())
+                .then(d => {
+                    const zipMeta = document.getElementById('zipPkgMeta');
+                    const btnZip = document.getElementById('btnDownloadZipPkg');
+                    const btnCompile = document.getElementById('btnCompile');
+
+                    if (d.zip.task_status === 'compiling') {
+                        zipMeta.innerHTML = `<span class="text-amber-400 font-semibold"><i class="fa-solid fa-spinner fa-spin mr-1"></i> ${d.zip.progress || 'Compilando pacote em segundo plano...'}</span>`;
+                        btnZip.classList.add('opacity-50', 'pointer-events-none');
+                        btnCompile.disabled = true;
+                        btnCompile.classList.add('opacity-50');
+                        if (!pollInterval) {
+                            pollInterval = setInterval(updatePackageStatus, 2000);
+                        }
+                    } else if (d.zip.exists) {
+                        zipMeta.innerHTML = `<span class="text-emerald-400 font-semibold">✓ Pronto (${d.zip.size_mb} MB)</span> • Atualizado em ${d.zip.updated_at}`;
+                        btnZip.classList.remove('opacity-50', 'pointer-events-none');
+                        btnCompile.disabled = false;
+                        btnCompile.classList.remove('opacity-50');
+                        btnCompile.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Recompilar Agora';
+                        if (pollInterval) {
+                            clearInterval(pollInterval);
+                            pollInterval = null;
+                        }
+                    } else {
+                        zipMeta.innerHTML = `<span class="text-slate-400">Pacote ainda não compilado para este mês.</span>`;
+                        btnCompile.disabled = false;
+                        btnCompile.classList.remove('opacity-50');
+                        btnCompile.innerHTML = '<i class="fa-solid fa-box-archive"></i> Compilar Pacote';
+                    }
+
+                    const pdfMeta = document.getElementById('pdfPkgMeta');
+                    if (d.pdf.exists) {
+                        pdfMeta.innerHTML = `<span class="text-emerald-400 font-semibold">✓ Gerado (${d.pdf.size_kb} KB)</span> • Atualizado em ${d.pdf.updated_at}`;
+                    } else {
+                        pdfMeta.innerHTML = `<span class="text-slate-400">Geração sob demanda (PDF oficial)</span>`;
+                    }
+                })
+                .catch(err => {
+                    console.error("Erro ao verificar status do pacote:", err);
+                });
+        }
+
+        function requestCompilePackage() {
+            const btnCompile = document.getElementById('btnCompile');
+            btnCompile.disabled = true;
+            btnCompile.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Iniciando...';
+
+            fetch(`/api/compile-package?client={{ client_id }}&year={{ year }}&month={{ month }}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(d => {
+                    updatePackageStatus();
+                    if (!pollInterval) {
+                        pollInterval = setInterval(updatePackageStatus, 2000);
+                    }
+                })
+                .catch(e => {
+                    alert("Erro ao solicitar compilação: " + e);
+                    btnCompile.disabled = false;
+                });
         }
 
         function downloadProductZip() {

@@ -369,8 +369,16 @@ def main():
             if args.product and prod_nome.lower() != args.product.lower():
                 continue
 
+            # Checagem de vigência (ex: novos hosts ativos apenas a partir de 2026-10-01)
+            vigencia_inicio = prod.get("vigencia_inicio")
+            hoje_iso = f"{year_str}-{month_str}-{day_str}"
+            if vigencia_inicio and hoje_iso < vigencia_inicio:
+                log(f"[-] Ignorando {prod_nome}: vigência inicia em {vigencia_inicio} (hoje é {hoje_iso})")
+                continue
+
             host = prod["host"]
-            url = prod["url"]
+            url = prod.get("url", f"https://{host}/")
+            prod_tools = prod.get("tools", ["nmap", "nikto", "owasp_zap"])
 
             # Estrutura de pastas: evidencias / Cliente / Produto / YYYY / MM / DD
             target_dir = EVIDENCIAS_DIR / cliente_id / prod_nome / year_str / month_str / day_str
@@ -388,7 +396,7 @@ def main():
             # ------------------------------------------------------------------
             # 1. NMAP FULL SCAN (1-65535) - Auditoria de Portas TCP
             # ------------------------------------------------------------------
-            if not args.tool or args.tool == "nmap":
+            if "nmap" in prod_tools and (not args.tool or args.tool == "nmap"):
                 nmap_cmd = [
                     "nmap", "-sT", "-sV", "-sC", "-Pn", "-p", "1-65535", "-T3",
                     "--max-retries", "1", "--min-rate", "1000",
@@ -424,7 +432,7 @@ def main():
             # ------------------------------------------------------------------
             # 2. NIKTO - DAST de Rotas e Servidor Web (XML e HTML Unificados)
             # ------------------------------------------------------------------
-            if not args.tool or args.tool == "nikto":
+            if "nikto" in prod_tools and (not args.tool or args.tool == "nikto"):
                 nikto_cmd = [
                     "nikto", "-h", url, "-ssl", "-timeout", "3", "-ask", "no",
                     "-o", str(nikto_xml)
@@ -462,7 +470,7 @@ def main():
             # ------------------------------------------------------------------
             # 3. OWASP ZAP - Spider + Active Scan de Rotas e Diretórios (XML, HTML, JSON)
             # ------------------------------------------------------------------
-            if not args.tool or args.tool == "owasp_zap":
+            if "owasp_zap" in prod_tools and (not args.tool or args.tool == "owasp_zap"):
                 run_zap_scan(cliente_id, prod_nome, url, target_dir, year_str, month_str, day_str)
 
             # 4. LIBERAR PERMISSÕES DAS EVIDÊNCIAS

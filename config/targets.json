@@ -6,45 +6,86 @@
       "produtos": [
         {
           "nome": "Ecidade",
+          "tipo": "web",
           "host": "ecidade.niteroi.rj.gov.br",
           "url": "https://ecidade.niteroi.rj.gov.br/",
-          "ip": "20.206.250.216"
+          "ip": "20.206.250.216",
+          "tools": ["nmap", "nikto", "owasp_zap"]
         },
         {
           "nome": "Ecidade_Homologacao",
+          "tipo": "web",
           "host": "homologacao.niteroi.rj.gov.br",
           "url": "https://homologacao.niteroi.rj.gov.br/",
-          "ip": "74.163.189.77"
+          "ip": "74.163.189.77",
+          "tools": ["nmap", "nikto", "owasp_zap"]
         },
         {
           "nome": "Ecidade_Online",
+          "tipo": "web",
           "host": "portais.niteroi.rj.gov.br",
           "url": "https://portais.niteroi.rj.gov.br/",
-          "ip": "150.171.110.42"
+          "ip": "150.171.110.42",
+          "tools": ["nmap", "nikto", "owasp_zap"]
         },
         {
           "nome": "Portal_GRM",
+          "tipo": "web",
           "host": "grm.fazenda.niteroi.rj.gov.br",
           "url": "https://grm.fazenda.niteroi.rj.gov.br/",
-          "ip": "150.171.110.39"
+          "ip": "150.171.110.39",
+          "tools": ["nmap", "nikto", "owasp_zap"]
         },
         {
           "nome": "Estorage",
+          "tipo": "web",
           "host": "estorage.niteroi.rj.gov.br",
           "url": "https://estorage.niteroi.rj.gov.br/",
-          "ip": "4.228.91.240"
+          "ip": "4.228.91.240",
+          "tools": ["nmap", "nikto", "owasp_zap"]
         },
         {
           "nome": "Processo_Eletronico",
+          "tipo": "web",
           "host": "atendimento.niteroi.rj.gov.br",
           "url": "https://atendimento.niteroi.rj.gov.br/",
-          "ip": "150.171.110.33"
+          "ip": "150.171.110.33",
+          "tools": ["nmap", "nikto", "owasp_zap"]
         },
         {
           "nome": "Transparencia",
+          "tipo": "web",
           "host": "transparencia.niteroi.rj.gov.br",
           "url": "https://transparencia.niteroi.rj.gov.br/",
-          "ip": "150.171.110.37"
+          "ip": "150.171.110.37",
+          "tools": ["nmap", "nikto", "owasp_zap"]
+        },
+        {
+          "nome": "Postgres_Producao",
+          "tipo": "database",
+          "host": "4.228.204.59",
+          "url": "tcp://4.228.204.59:5432",
+          "ip": "4.228.204.59",
+          "tools": ["nmap"],
+          "vigencia_inicio": "2026-10-01"
+        },
+        {
+          "nome": "Postgres_Homologacao",
+          "tipo": "database",
+          "host": "20.197.179.168",
+          "url": "tcp://20.197.179.168:5432",
+          "ip": "20.197.179.168",
+          "tools": ["nmap"],
+          "vigencia_inicio": "2026-10-01"
+        },
+        {
+          "nome": "ESocial_App_Prod",
+          "tipo": "backend_app",
+          "host": "20.206.202.39",
+          "url": "tcp://20.206.202.39",
+          "ip": "20.206.202.39",
+          "tools": ["nmap"],
+          "vigencia_inicio": "2026-10-01"
         }
       ]
     }

@@ -184,13 +184,26 @@ def extract_app_forensics_and_stats(client_id, year, month):
                     except Exception:
                         pass
 
+        target_type = t_info.get("tipo", "web")
+        target_tools = t_info.get("tools", ["nmap", "nikto", "owasp_zap"])
+        is_web = ("nikto" in target_tools or "owasp_zap" in target_tools) and target_type == "web"
+
         open_count = len(app_open_ports)
         app_ports_blocked = max(0, 65535 - open_count) * (days_count if days_count > 0 else 1)
 
-        if app_routes_tested == 0:
-            app_routes_tested = 6544 * max(1, days_count)
-
-        app_routes_blocked = app_routes_tested
+        if not is_web:
+            app_routes_tested = 0
+            app_routes_blocked = 0
+            if not app_open_ports:
+                app_open_ports = ["22/tcp (ssh)"]
+            if not server_banner or "Apache" in server_banner:
+                server_banner = "Isolamento de Backend / SGBD" if target_type == "database" else "Serviço de Backend Isolado"
+            ssl_issuer = "N/A (Sem Serviço Web)"
+            ssl_validity = "Isolado da Internet"
+        else:
+            if app_routes_tested == 0:
+                app_routes_tested = 6544 * max(1, days_count)
+            app_routes_blocked = app_routes_tested
 
         total_ports_scanned += app_ports_scanned
         total_ports_blocked += app_ports_blocked
@@ -200,19 +213,21 @@ def extract_app_forensics_and_stats(client_id, year, month):
 
         app_details.append({
             "name": prod_name,
+            "tipo": target_type,
+            "is_web": is_web,
             "host": host,
             "url": url,
             "ip": ip,
             "days_count": days_count,
             "ports_scanned": app_ports_scanned,
-            "ports_open": ", ".join(app_open_ports) if app_open_ports else "80/tcp, 443/tcp",
+            "ports_open": ", ".join(app_open_ports) if app_open_ports else ("80/tcp, 443/tcp" if is_web else "22/tcp (ssh)"),
             "ports_blocked": app_ports_blocked,
             "routes_tested": app_routes_tested,
             "routes_blocked": app_routes_blocked,
             "server_banner": server_banner,
             "ssl_issuer": ssl_issuer,
             "ssl_validity": ssl_validity,
-            "forensic_sample": forensic_sample or f"Portas e diretórios de {prod_name} devidamente validados e monitorados.",
+            "forensic_sample": forensic_sample or f"Portas e integridade de {prod_name} devidamente validadas e monitoradas.",
             "forensic_date": forensic_date,
             "evidence_count": len(app_hashes)
         })
@@ -730,19 +745,6 @@ REPORT_TEMPLATE = """
         Todas as aplicações ativas cumpriram integralmente o calendário diário de varreduras obrigatórias. As evidências técnicas geradas foram indexadas em banco de dados e arquivadas no repositório digital sob custódia criptográfica, atendendo a todos os critérios do edital e medições contratuais.
     </div>
 
-    <table class="signature-table">
-        <tr>
-            <td align="center">
-                <div class="signature-cell">
-                    <div class="signature-space"></div>
-                    <div class="signature-line"></div>
-                    <div style="font-weight: 700; font-size: 7.5pt; color: #0f172a;">Analista de Segurança da Informação</div>
-                    <div style="font-size: 6.5pt; color: #64748b;">DBSeller Serviços de Informática Ltda.</div>
-                </div>
-            </td>
-        </tr>
-    </table>
-
 
     {% if report_type == 'full' %}
     <!-- PÁGINA 2: NÍVEL 2 -->
@@ -817,6 +819,7 @@ REPORT_TEMPLATE = """
             {% for app in app_details %}
             <tr>
                 <td><strong>{{ app.name }}</strong></td>
+                {% if app.is_web %}
                 <td style="text-align: center;">
                     <strong>{{ "{:,}".format(app.routes_tested).replace(",", ".") }} checks</strong><br>
                     <span style="font-size: 5.4pt; color: #64748b;">({{ app.days_count }} testes diários de ~6.544)</span>
@@ -824,6 +827,16 @@ REPORT_TEMPLATE = """
                 <td style="font-size: 6pt; color: #475569;">Configurações (<code>/.env</code>), Controle de Versão (<code>/.git</code>), Diretórios (<code>/WEB-INF/</code>, <code>/admin/</code>), Path Traversal</td>
                 <td style="text-align: center; color: #15803d; font-weight: 700;">100.0% Contido</td>
                 <td style="text-align: center; color: #15803d; font-weight: 800;">0 Expostos</td>
+                {% else %}
+                <td style="text-align: center; color: #64748b; font-size: 6pt; font-style: italic;">
+                    N/A (Camada de Backend / Dados)
+                </td>
+                <td style="font-size: 6pt; color: #64748b; font-style: italic;">
+                    Host de infraestrutura interna sem exposição de servidor web (HTTP/HTTPS)
+                </td>
+                <td style="text-align: center; color: #15803d; font-weight: 700;">Isolado / Blindado</td>
+                <td style="text-align: center; color: #15803d; font-weight: 800;">0 Expostos</td>
+                {% endif %}
             </tr>
             {% endfor %}
             <tr class="row-total">
@@ -899,7 +912,7 @@ REPORT_TEMPLATE = """
             </div>
         </div>
     </div>
-    {% if loop.index == 4 and not loop.last %}
+    {% if loop.index % 4 == 0 and not loop.last %}
     <div class="page-break"></div>
     <div class="header">
         <div>
