@@ -434,9 +434,11 @@ def main():
             # ------------------------------------------------------------------
             if "nikto" in prod_tools and (not args.tool or args.tool == "nikto"):
                 nikto_cmd = [
-                    "nikto", "-h", url, "-ssl", "-timeout", "3", "-ask", "no",
+                    "nikto", "-h", url, "-timeout", "3", "-ask", "no",
                     "-o", str(nikto_xml)
                 ]
+                if url.startswith("https://"):
+                    nikto_cmd.insert(3, "-ssl")
                 ok_nikto, log_nikto, dur_nikto = run_cmd(nikto_cmd, f"2/3. Nikto DAST ({url})")
 
                 # Se o Nikto enviou o XML para o stdout ou houve atraso de flush em disco

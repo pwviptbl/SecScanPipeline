@@ -80,11 +80,11 @@
         },
         {
           "nome": "ESocial_App_Prod",
-          "tipo": "backend_app",
-          "host": "20.206.202.39",
-          "url": "tcp://20.206.202.39",
+          "tipo": "web",
+          "host": "ecidade-apiesocial.niteroi.rj.gov.br",
+          "url": "http://ecidade-apiesocial.niteroi.rj.gov.br/",
           "ip": "20.206.202.39",
-          "tools": ["nmap"],
+          "tools": ["nmap", "nikto", "owasp_zap"],
           "vigencia_inicio": "2026-10-01"
         }
       ]
